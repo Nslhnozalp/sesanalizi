@@ -1,0 +1,275 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ses Analizi Dashboard - WS Client</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js">
+const repStats = {};
+const chart = new Chart(document.getElementById("scoreChart"), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: []
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { min: -1, max: 1 }
+        }
+    }
+});
+
+function updateStats(rep, score) {
+    if (!repStats[rep]) {
+        repStats[rep] = { total: 0, count: 0, scores: [] };
+
+        chart.data.datasets.push({
+            label: rep,
+            data: [],
+            borderWidth: 2,
+            tension: 0.3
+        });
+    }
+
+    repStats[rep].count++;
+    repStats[rep].total += score;
+    repStats[rep].scores.push(score);
+
+    // Update chart
+    const ds = chart.data.datasets.find(d => d.label === rep);
+    if (ds) {
+        ds.data.push(score);
+    }
+
+    chart.data.labels.push(chart.data.labels.length + 1);
+    chart.update();
+
+    // Update table
+    const tbody = document.getElementById("scoreTableBody");
+    tbody.innerHTML = "";
+    Object.entries(repStats).forEach(([rep, data]) => {
+        const avg = (data.total / data.count).toFixed(2);
+        const row = document.createElement("tr");
+        const color = avg >= 0.4 ? 'text-success' : avg < 0 ? 'text-danger' : 'text-muted';
+        row.innerHTML = `
+            <td><strong>${rep}</strong></td>
+            <td>${data.count}</td>
+            <td class="${color}">${avg}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+</script>
+    <style>
+        body { font-size: 1.2rem; }
+        .badge { font-size: 1rem; }
+        #log { font-size: 0.9rem; color: #999; }
+    </style>
+</head>
+<body>
+<div class="container mt-4">
+    <h2>Gerçek Zamanlı WS Panel</h2>
+    <div id="log" class="mb-3">WebSocket bağlantısı bekleniyor...</div>
+    
+<div class="row">
+    <div class="col-md-6">
+        <h4>Ortalama Skor Tablosu</h4>
+        <table class="table table-sm table-bordered">
+            <thead class="table-light"><tr><th>Temsilci</th><th>Toplam</th><th>Ortalama Skor</th></tr></thead>
+            <tbody id="scoreTableBody"></tbody>
+        </table>
+    </div>
+    <div class="col-md-6">
+        <h4>Skor Grafiği (Chart.js)</h4>
+        <canvas id="scoreChart" height="180"></canvas>
+    </div>
+</div>
+<hr>
+<div id="output"></div>
+</div>
+
+<script>
+// WebSocket simüle ediliyor
+
+// Basit kelime skoru simülasyonu
+const wordScores = {
+    "teşekkür": 1,
+    "nazik": 0.8,
+    "kötü": -1,
+    "ulaşmadı": -0.9,
+    "kararsız": -0.3,
+    "uğraştırdı": -0.4,
+    "çözüldü": 0.3,
+    "yardımcı": 0.5
+};
+
+function calculateScore(text) {
+    const words = text.toLowerCase().split(/\s+/);
+    let score = 0, count = 0;
+    words.forEach(w => {
+        if (wordScores[w] !== undefined) {
+            score += wordScores[w];
+            count++;
+        }
+    });
+    return count > 0 ? score / count : 0;
+}
+
+function getAdvice(score) {
+    if (score < -0.5) return ["Negatif", "Özür dileyin ve net çözüm adımı verin."];
+    if (score < 0) return ["Negatif", "Empati kurun ve çözüm önerin."];
+    if (score < 0.3) return ["Nötr", "Sorunu netleştirmek için açık uçlu sorular sorun."];
+    return ["Pozitif", "Teşekkür edin ve memnuniyetini pekiştirin."];
+}
+
+const ws = new WebSocket("ws://localhost:8000/ws");
+
+ws.onopen = () => {
+    document.getElementById("log").textContent = "WebSocket bağlantısı kuruldu.";
+};
+
+ws.onerror = () => {
+    document.getElementById("log").textContent = "WebSocket bağlantı hatası.";
+};
+
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    const score = calculateScore(data.text);
+    const [sentiment, advice] = getAdvice(score);
+    updateStats(data.rep, score);
+    handleMessage({ data: JSON.stringify(data) });
+};
+// Simülasyon başlat
+
+// simulateMessage() kaldırıldı
+    const data = {
+        rep: reps[Math.floor(Math.random() * reps.length)],
+        text: texts[Math.floor(Math.random() * texts.length)],
+        timestamp: new Date().toISOString()
+    };
+
+    const score = calculateScore(data.text);
+    const [sentiment, advice] = getAdvice(score);
+    updateStats(data.rep, score);
+    
+}
+    document.getElementById("log").textContent = "WebSocket bağlantısı kuruldu.";
+};
+
+ws.onerror = (e) => {
+    document.getElementById("log").textContent = "WebSocket HATASI: Sunucuya bağlanılamadı.";
+};
+
+function handleMessage(event) {
+    const data = JSON.parse(event.data);
+    const score = calculateScore(data.text);
+    const [sentiment, advice] = getAdvice(score);
+    const panel = document.getElementById("output");
+
+    const div = document.createElement("div");
+    div.classList.add("border", "p-3", "mb-3", "rounded");
+    div.innerHTML = `
+        <strong>${data.rep}</strong> çağrısı:
+        <blockquote>${data.text}</blockquote>
+        <p>
+            <span class="badge bg-${sentiment === 'Pozitif' ? 'success' : sentiment === 'Negatif' ? 'danger' : 'secondary'}">
+                ${sentiment}
+            </span>
+            <span class="ms-2">${advice}</span>
+        </p>
+    `;
+    panel.prepend(div);
+    updateStats(data.rep, score);
+}
+
+const reps = ["Ayşe", "Can", "Mert", "Zeynep", "Ali"];
+const texts = [
+    "Ürünüm hâlâ elime ulaşmadı.",
+    "Destek ekibi çok nazikti, teşekkür ederim.",
+    "Şu an çok kararsız kaldım, emin olamıyorum.",
+    "Gerçekten çok kötü bir deneyim yaşadım.",
+    "Sorun çözüldü ama biraz uğraştırdı."
+];
+
+// simulateMessage() kaldırıldı
+    const data = {
+        rep: reps[Math.floor(Math.random() * reps.length)],
+        text: texts[Math.floor(Math.random() * texts.length)],
+        timestamp: new Date().toISOString()
+    };
+
+    const score = calculateScore(data.text);
+    const [sentiment, advice] = getAdvice(score);
+    updateStats(data.rep, score);
+    
+}
+    const data = {
+        rep: reps[Math.floor(Math.random() * reps.length)],
+        text: texts[Math.floor(Math.random() * texts.length)],
+        timestamp: new Date().toISOString()
+    };
+    
+}
+
+const repStats = {};
+const chart = new Chart(document.getElementById("scoreChart"), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: []
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { min: -1, max: 1 }
+        }
+    }
+});
+
+function updateStats(rep, score) {
+    if (!repStats[rep]) {
+        repStats[rep] = { total: 0, count: 0, scores: [] };
+
+        chart.data.datasets.push({
+            label: rep,
+            data: [],
+            borderWidth: 2,
+            tension: 0.3
+        });
+    }
+
+    repStats[rep].count++;
+    repStats[rep].total += score;
+    repStats[rep].scores.push(score);
+
+    // Update chart
+    const ds = chart.data.datasets.find(d => d.label === rep);
+    if (ds) {
+        ds.data.push(score);
+    }
+
+    chart.data.labels.push(chart.data.labels.length + 1);
+    chart.update();
+
+    // Update table
+    const tbody = document.getElementById("scoreTableBody");
+    tbody.innerHTML = "";
+    Object.entries(repStats).forEach(([rep, data]) => {
+        const avg = (data.total / data.count).toFixed(2);
+        const row = document.createElement("tr");
+        const color = avg >= 0.4 ? 'text-success' : avg < 0 ? 'text-danger' : 'text-muted';
+        row.innerHTML = `
+            <td><strong>${rep}</strong></td>
+            <td>${data.count}</td>
+            <td class="${color}">${avg}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+</script>
+</body>
+</html>
